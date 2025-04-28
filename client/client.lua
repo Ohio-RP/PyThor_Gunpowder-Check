@@ -10,6 +10,9 @@ end
 -- events
 RegisterNetEvent("GP:CheckJob")
 RegisterNetEvent("GP:CheckJobResult")
+RegisterNetEvent("GP:SetGunpowderServer")
+RegisterNetEvent("GP:CheckGunpowderServer")
+RegisterNetEvent("GP:CheckGunpowderResult")
 
 -- Decorators
 DecorRegister("HasShot", 2)
@@ -43,6 +46,40 @@ exports('HasGunpowderResidue', function(target)
         return DecorGetBool(target, "HasShot")
     end
     return false
+end)
+
+-- Get weapon hash that caused the residue
+exports('GetResidueWeapon', function(target)
+    if not target then
+        target = PlayerPedId()
+    end
+    
+    if DecorExistOn(target, "GunpowderWeapon") then
+        return DecorGetInt(target, "GunpowderWeapon")
+    end
+    return 0
+end)
+
+-- Get washes done and required
+exports('GetWashesInfo', function(target)
+    if not target then
+        target = PlayerPedId()
+    end
+    
+    local info = {
+        done = 0,
+        required = Config.WashesToClean
+    }
+    
+    if DecorExistOn(target, "WashesDone") then
+        info.done = DecorGetInt(target, "WashesDone")
+    end
+    
+    if DecorExistOn(target, "WashesRequired") then
+        info.required = DecorGetInt(target, "WashesRequired")
+    end
+    
+    return info
 end)
 
 -- Manually set gunpowder residue on a player
@@ -128,11 +165,21 @@ exports('SetGunpowderResidue', function(state, weaponHash, target)
     return false
 end)
 
--- Get remaining time for gunpowder residue
+-- Get remaining time for gunpowder residue - placeholder function
 exports('GetGunpowderTimeLeft', function(target)
-    -- This would require storing the time remaining somewhere, which we're not currently doing
-    -- This export is just a placeholder - you would need to implement time tracking
-    return 0 -- Not implemented yet
+    -- Esta função exigiria o armazenamento do tempo restante em algum lugar, 
+    -- o que não estamos fazendo atualmente
+    return 0 -- Não implementado ainda
+end)
+
+-- Manipuladores de eventos
+AddEventHandler("GP:SetGunpowderServer", function(state, weaponHash)
+    exports[GetCurrentResourceName()]:SetGunpowderResidue(state, weaponHash)
+end)
+
+AddEventHandler("GP:CheckGunpowderServer", function()
+    local hasResidue = exports[GetCurrentResourceName()]:HasGunpowderResidue()
+    TriggerServerEvent("GP:CheckGunpowderResult", hasResidue)
 end)
 
 Citizen.CreateThread(function()
@@ -156,7 +203,7 @@ RegisterCommand(command, function(source, args)
     end
 
     if not targetId then
-        Dev("Usage: /gp [playerID]")
+        Dev("Uso: /gp [playerID]")
         return
     end
 
@@ -175,6 +222,14 @@ RegisterCommand(command, function(source, args)
         progressbar.start("Verificando resíduos de pólvora", 5000, function()
             if DecorExistOn(targetPed, "HasShot") and DecorGetBool(targetPed, "HasShot") then
                 Core.NotifyObjective("Esta pessoa " .. "disparou uma arma recentemente!", 5000)
+                
+                -- Se for desenvolver
+                if Config.DevMode then
+                    local weaponHash = DecorGetInt(targetPed, "GunpowderWeapon")
+                    local washInfo = exports[GetCurrentResourceName()]:GetWashesInfo(targetPed)
+                    Dev("Arma usada: " .. weaponHash)
+                    Dev("Lavagens feitas: " .. washInfo.done .. "/" .. washInfo.required)
+                end
             else
                 Core.NotifyObjective("Esta pessoa " .. "está limpa.", 5000)
             end
@@ -202,14 +257,14 @@ Citizen.CreateThread(function()
             local _, weaponHash = GetCurrentPedWeapon(player, true)
             Dev(weaponHash)
             if not isWeaponWhitelist(weaponHash) then
-                Dev("Player shot a weapon (not lasso)")
+                Dev("Player shot a weapon (not whitelisted)")
                 
                 -- Use our export to set the gunpowder residue
                 exports[GetCurrentResourceName()]:SetGunpowderResidue(true, weaponHash, player)
                 
                 Core.NotifyRightTip("Você tem resíduos de pólvora em você.", 4000)
             else
-                Dev("Player used lasso or bow, ignoring")
+                Dev("Player used whitelisted weapon, ignoring")
             end
         end
     end
