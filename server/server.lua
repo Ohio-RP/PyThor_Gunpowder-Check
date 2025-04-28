@@ -11,6 +11,7 @@ RegisterNetEvent("GP:CheckJob")
 RegisterNetEvent("GP:CheckJobResult")
 RegisterNetEvent("GP:SetGunpowderServer")
 RegisterNetEvent("GP:CheckGunpowderServer")
+RegisterNetEvent("GP:CheckGunpowderResult")
 
 -- EXPORTS
 -- Server-side export to check if player has gunpowder residue
@@ -50,4 +51,13 @@ AddEventHandler("GP:CheckJob", function(src)
         end
     end
     TriggerClientEvent("GP:CheckJobResult", src, is_law)
+end)
+
+-- Manipulador para o resultado da verificação de resíduo
+AddEventHandler("GP:CheckGunpowderResult", function(hasResidue)
+    -- Aqui você poderia armazenar o resultado ou enviá-lo para o cliente que solicitou
+    -- Este é um exemplo simplificado
+    local src = source
+    -- Faça algo com o resultado (hasResidue)
+    Dev("Player " .. src .. " has gunpowder residue: " .. tostring(hasResidue))
 end)
